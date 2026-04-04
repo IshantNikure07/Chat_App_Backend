@@ -39,7 +39,11 @@ async function register(req, res) {
             [username, email, hashedPassword]
         );
 
-        const token = jwt.sign({ id: result.insertId }, process.env.JWT_SECRET, { expiresIn: "15m" });
+        const token = jwt.sign(
+            { user: { id: result.insertId, username, email } }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: "15m" }
+        );
 
         return res.status(201).json({
             success: true,
@@ -80,7 +84,7 @@ async function getMe(req, res) {
             });
         }
 
-        const { id } = decoded;
+        const id = decoded.user ? decoded.user.id : decoded.id;
 
         const [rows] = await db.query(
             "SELECT id, username, email FROM users WHERE id = ?",
@@ -132,7 +136,11 @@ async function login(req, res) {
             return res.status(400).json({ success: false, message: "Invalid Email or Password" });
         }
 
-        const token = jwt.sign({ id: rows[0].id }, process.env.JWT_SECRET, { expiresIn: "15m" });
+        const token = jwt.sign(
+            { user: { id: rows[0].id, username: rows[0].username, email: rows[0].email } }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: "15m" }
+        );
         const refreshToken = jwt.sign({ id: rows[0].id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
         await db.query(
@@ -211,7 +219,7 @@ async function refreshToken(req, res) {
             });
         }
 
-        const { id } = decoded;
+        const id = decoded.user ? decoded.user.id : decoded.id;
 
         // 4. ROTATION (IMPORTANT 🔥)
         await db.query(
@@ -231,8 +239,9 @@ async function refreshToken(req, res) {
         );
 
         // 5. New access token
+        const [userRows] = await db.query("SELECT id, username, email FROM users WHERE id = ?", [id]);
         const newAccessToken = jwt.sign(
-            { id },
+            { user: { id: userRows[0].id, username: userRows[0].username, email: userRows[0].email } },
             process.env.JWT_SECRET,
             { expiresIn: "15m" }
         );

@@ -1,9 +1,16 @@
 import app from "./src/app.js";
-import dotenv from "dotenv";
-dotenv.config();
+import http from "http";
+import { initSocket } from "./src/socket/socket.js";
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
-app.listen(PORT, () => {
+// Create HTTP server from Express app
+const server = http.createServer(app);
+
+// Initialize Socket.IO on the same server
+const io = initSocket(server);
+
+// ✅ Start the server (not app.listen)
+server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
 });
