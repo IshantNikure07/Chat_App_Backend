@@ -76,6 +76,20 @@ export function initSocket(server){
                 }
             }
         });
+
+        socket.on("typing", (data) => {
+            const receiverSocketId = onlineUsers.get(data.receiverId);
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit("typing", data);
+            }
+        });
+
+        socket.on("stopTyping", (data) => {
+            const receiverSocketId = onlineUsers.get(data.receiverId);
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit("stopTyping", data);
+            }
+        });
         
         socket.on("disconnect", () => {
             console.log("user disconnected:", userId);

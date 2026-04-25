@@ -1,10 +1,11 @@
 import express from "express";
 import morgan from "morgan";
-import db from "./config/db.js";
 import authRoutes from "./routes/auth.routes.js";
+import conversationRoutes from "./routes/conversation.routes.js";
+import userRoutes from "./routes/user.routes.js";
 import cors from "cors";
 
-const app = express();
+const app = express();  
 
 app.use(cors({
     origin: "*",   // or specify your frontend URL e.g., "http://localhost:8081"
@@ -15,8 +16,10 @@ app.use(morgan("dev"));
 
 app.get("/", (req, res) => {
     res.send("Hello World!");
-});
+}); 
 
 app.use("/api/auth", authRoutes);
+app.use("/api/conversation", conversationRoutes);
+app.use("/api/users", userRoutes);
 
 export default app;
