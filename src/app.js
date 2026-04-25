@@ -12,6 +12,7 @@ app.use(cors({
     credentials: true,
 }));
 app.use(express.json());
+app.use("/public", express.static("public"));
 app.use(morgan("dev"));
 
 app.get("/", (req, res) => {
