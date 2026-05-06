@@ -4,8 +4,11 @@ import authRoutes from "./routes/auth.routes.js";
 import conversationRoutes from "./routes/conversation.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import cors from "cors";
+import { setupSwagger } from "./swagger.js";
 
 const app = express();  
+
+setupSwagger(app);
 
 app.use(cors({
     origin: "*",   // or specify your frontend URL e.g., "http://localhost:8081"
