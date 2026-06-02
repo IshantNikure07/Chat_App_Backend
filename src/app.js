@@ -3,6 +3,7 @@ import morgan from "morgan";
 import authRoutes from "./routes/auth.routes.js";
 import conversationRoutes from "./routes/conversation.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import messageRoutes from "./routes/message.routes.js";
 import cors from "cors";
 import { setupSwagger } from "./swagger.js";
 
@@ -22,8 +23,10 @@ app.get("/", (req, res) => {
     res.send("Hello World!");
 }); 
 
+
 app.use("/api/auth", authRoutes);
 app.use("/api/conversation", conversationRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/messages", messageRoutes);
 
 export default app;

@@ -72,7 +72,7 @@ async function getConversations(req, res) {
             `SELECT 
                 c.id as conversation_id, c.type, c.last_message_id,
                 m.content as last_message_content, m.created_at as last_message_time,
-                u.id as other_user_id, u.username as other_user_name, u.email as other_user_email
+                u.id as other_user_id, u.username as other_user_name, u.email as other_user_email, u.avatar as other_user_avatar
             FROM conversations c
             JOIN conversation_participants cp1 ON c.id = cp1.conversation_id AND cp1.user_id = ?
             LEFT JOIN conversation_participants cp2 ON c.id = cp2.conversation_id AND cp2.user_id != ?
@@ -84,34 +84,32 @@ async function getConversations(req, res) {
 
         const formattedConversations = conversations.reduce((acc, row) => {
             if (!acc[row.conversation_id]) {
+                const date = row.last_message_time ? new Date(row.last_message_time) : null;
+                const timeStr = date ? date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '';
+                
                 acc[row.conversation_id] = {
-                    id: row.conversation_id,
-                    type: row.type,
-                    lastMessage: row.last_message_id ? {
-                        id: row.last_message_id,
-                        content: row.last_message_content,
-                        createdAt: row.last_message_time
-                    } : null,
-                    participants: []
+                    id: row.conversation_id.toString(),
+                    name: row.other_user_name || 'Unknown',
+                    lastMessage: row.last_message_content || 'No message',
+                    time: timeStr || "no date",
+                    unreadCount: 3,
+                    avatar: row.other_user_avatar || `https://ui-avatars.com/api/?name=${row.other_user_name ? encodeURIComponent(row.other_user_name) : 'User'}&background=random`,
+                    _timestamp: date ? date.getTime() : 0
                 };
-            }
-            if (row.other_user_id) {
-                acc[row.conversation_id].participants.push({
-                    id: row.other_user_id,
-                    username: row.other_user_name,
-                    email: row.other_user_email
-                });
             }
             return acc;
         }, {});
 
         // Sort formatted conversations by last message time or conversation ID
-        const sortedConversations = Object.values(formattedConversations).sort((a, b) => {
-            const timeA = a.lastMessage ? new Date(a.lastMessage.createdAt).getTime() : 0;
-            const timeB = b.lastMessage ? new Date(b.lastMessage.createdAt).getTime() : 0;
-            if (timeA !== timeB) return timeB - timeA;
-            return b.id - a.id;
-        });
+        const sortedConversations = Object.values(formattedConversations)
+            .sort((a, b) => {
+                if (a._timestamp !== b._timestamp) return b._timestamp - a._timestamp;
+                return parseInt(b.id) - parseInt(a.id);
+            })
+            .map(conv => {
+                delete conv._timestamp;
+                return conv;
+            });
 
         return res.status(200).json({ 
             success: true, 
