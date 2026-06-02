@@ -24,6 +24,21 @@ async function getMessages(req, res) {
             [conversationId]
         );
 
+        if (messages.length > 0) {
+            const lastMessageId = messages[messages.length - 1].id;
+            await db.query(
+                "UPDATE conversation_participants SET last_read_message_id = ? WHERE conversation_id = ? AND user_id = ?",
+                [lastMessageId, conversationId, userId]
+            );
+        }
+
+        const [rows] = await db.query(
+            `SELECT * FROM users WHERE id = ?`,
+            [userId]
+                );
+
+        const senderData = rows[0]; 
+
         const formattedMessages = messages.map(msg => {
             const date = new Date(msg.created_at);
             const timeStr = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -38,7 +53,8 @@ async function getMessages(req, res) {
 
         return res.status(200).json({
             success: true,
-            messages: formattedMessages
+            messages: formattedMessages,
+            sender:senderData
         });
 
     } catch (error) {

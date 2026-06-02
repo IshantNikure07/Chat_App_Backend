@@ -72,14 +72,21 @@ async function getConversations(req, res) {
             `SELECT 
                 c.id as conversation_id, c.type, c.last_message_id,
                 m.content as last_message_content, m.created_at as last_message_time,
-                u.id as other_user_id, u.username as other_user_name, u.email as other_user_email, u.avatar as other_user_avatar
+                u.id as other_user_id, u.username as other_user_name, u.email as other_user_email, u.avatar as other_user_avatar,
+                (
+                    SELECT COUNT(*) 
+                    FROM messages msg 
+                    WHERE msg.conversation_id = c.id 
+                      AND msg.sender_id != ? 
+                      AND (cp1.last_read_message_id IS NULL OR msg.id > cp1.last_read_message_id)
+                ) as unread_count
             FROM conversations c
             JOIN conversation_participants cp1 ON c.id = cp1.conversation_id AND cp1.user_id = ?
             LEFT JOIN conversation_participants cp2 ON c.id = cp2.conversation_id AND cp2.user_id != ?
             LEFT JOIN users u ON cp2.user_id = u.id
             LEFT JOIN messages m ON c.last_message_id = m.id
             ORDER BY m.created_at DESC, c.id DESC`,
-            [userId, userId]
+            [userId, userId, userId]
         );
 
         const formattedConversations = conversations.reduce((acc, row) => {
@@ -92,7 +99,7 @@ async function getConversations(req, res) {
                     name: row.other_user_name || 'Unknown',
                     lastMessage: row.last_message_content || 'No message',
                     time: timeStr || "no date",
-                    unreadCount: 3,
+                    unreadCount: Number(row.unread_count || 0),
                     avatar: row.other_user_avatar || `https://ui-avatars.com/api/?name=${row.other_user_name ? encodeURIComponent(row.other_user_name) : 'User'}&background=random`,
                     _timestamp: date ? date.getTime() : 0
                 };

@@ -91,5 +91,89 @@ async function searchFriend(req, res){
         return res.status(500).json({ success: false, message: "Internal server error" });
     }
 }
+/**
+ * @swagger
+ * /api/users/{userId}/upload-avatar:
+ *   post:
+ *     summary: Upload profile picture by user ID
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The user ID to update the avatar for
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - avatar
+ *             properties:
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *                 description: The profile picture file (jpeg, png, jpg, webp)
+ *     responses:
+ *       200:
+ *         description: Profile picture uploaded successfully
+ *       400:
+ *         description: Bad request (missing file or invalid user ID)
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Internal server error
+ */
+async function uploadAvatar(req, res) {
+    try {
+        const userId = Number(req.params.userId);
+        if (!userId) {
+            return res.status(400).json({ success: false, message: "Invalid or missing userId" });
+        }
 
-export default { getUsers, searchFriend };
+        // Security check: ensure user can only upload their own profile picture
+        if (req.user && Number(req.user.id) !== userId) {
+            return res.status(403).json({ success: false, message: "Forbidden: You can only upload your own profile picture" });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ success: false, message: "No file uploaded" });
+        }
+
+        // Verify user exists first
+        const userExists = await prisma.user.findUnique({
+            where: { id: userId }
+        });
+        if (!userExists) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        const avatarUrl = "/public/uploads/" + req.file.filename;
+
+        // Update user avatar in DB
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: { avatar: avatarUrl },
+            select: {
+                id: true,
+                username: true,
+                email: true,
+                avatar: true
+            }
+        });
+
+        return res.status(200).json({ 
+            success: true, 
+            message: "Profile picture uploaded successfully", 
+            user: updatedUser 
+        });
+    } catch (error) {
+        console.error("Upload Avatar Error:", error);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
+}
+
+export default { getUsers, searchFriend, uploadAvatar };
