@@ -36,9 +36,13 @@ export function initSocket(server){
         
         if (userId) {
             onlineUsers.set(userId, socket.id);
-            // Optional: emit to all users that someone came online
-            // io.emit("getOnlineUsers", Array.from(onlineUsers.keys()));
+            // emit to all users that someone came online
+            io.emit("getOnlineUsers", Array.from(onlineUsers.keys()));
         }
+
+        socket.on("requestOnlineUsers", () => {
+            socket.emit("getOnlineUsers", Array.from(onlineUsers.keys()));
+        });
 
         // --- NEW: Handle Sending Messages ---
         socket.on("sendMessage", async (data, callback) => {
@@ -95,8 +99,8 @@ export function initSocket(server){
             console.log("user disconnected:", userId);
             if (userId) {
                 onlineUsers.delete(userId);
-                // Optional: emit to all users that someone went offline
-                // io.emit("getOnlineUsers", Array.from(onlineUsers.keys()));
+                // emit to all users that someone went offline
+                io.emit("getOnlineUsers", Array.from(onlineUsers.keys()));
             }
         });
     });
