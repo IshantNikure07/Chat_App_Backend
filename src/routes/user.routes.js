@@ -4,8 +4,9 @@ import { authenticate } from '../middleware/auth.middleware.js';
 
 const userRouter = Router();
 
-userRouter.use(authenticate);
+// userRouter.use(authenticate);
 
 userRouter.get("/", userController.getUsers);
+userRouter.get("/search/:name", userController.searchFriend);
 
 export default userRouter;
