@@ -65,16 +65,18 @@ async function searchFriend(req, res){
             return res.status(403).json({ success: false, message: "Forbidden: Invalid Internal API Key" });
         }
 
-        const userId = Number(req.user.id);
+        const userId = req.user ? Number(req.user.id) : null;
         const { name } = req.params;
         const users = await prisma.user.findMany({
             where: {
                 username: {
                     contains: name,
                 },
-                id: {
-                    not: userId,
-                },
+                ...(userId ? {
+                    id: {
+                        not: userId,
+                    },
+                } : {}),
             },
             select: {
                 id: true,

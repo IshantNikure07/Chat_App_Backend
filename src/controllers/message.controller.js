@@ -1,4 +1,5 @@
 import db from "../config/db.js";
+import MessageService from "../services/message.service.js";
 
 async function getMessages(req, res) {
     try {
@@ -46,4 +47,82 @@ async function getMessages(req, res) {
     }
 }
 
-export default { getMessages };
+/**
+ * @swagger
+ * /api/messages/send:
+ *   post:
+ *     summary: Send a message
+ *     tags: [Messages]
+ *     security: []
+ *     parameters:
+ *       - in: header
+ *         name: x-internal-api-key
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Internal API key for validation
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - sender_id
+ *               - receiver_id
+ *               - message
+ *             properties:
+ *               sender_id:
+ *                 type: string
+ *                 description: The sender's user ID
+ *               receiver_id:
+ *                 type: string
+ *                 description: The receiver's user ID
+ *               message:
+ *                 type: string
+ *                 description: The message text content
+ *     responses:
+ *       201:
+ *         description: Message sent successfully
+ *       400:
+ *         description: Missing required fields
+ *       403:
+ *         description: Forbidden (Invalid API Key)
+ *       500:
+ *         description: Internal server error
+ */
+async function sendMessage(req, res) {
+    try {
+        const apiKey = req.headers['x-internal-api-key'] || req.headers['internal-api-key'];
+        if (!apiKey || apiKey !== process.env.INTERNAL_API_KEY) {
+            return res.status(403).json({ success: false, message: "Forbidden: Invalid Internal API Key" });
+        }
+
+        const { sender_id, receiver_id, message } = req.body;
+
+        if (!sender_id || !receiver_id || !message) {
+            return res.status(400).json({ 
+                success: false, 
+                message: "Missing required fields: sender_id, receiver_id, message" 
+            });
+        }
+
+        const savedMessage = await MessageService.processMessage({
+            senderId: Number(sender_id),
+            receiverId: Number(receiver_id),
+            content: message,
+            isGroup: false
+        });
+
+        return res.status(201).json({
+            success: true,
+            message: "Message sent successfully",
+            data: savedMessage
+        });
+    } catch (error) {
+        console.error("Send Message Error:", error);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
+}
+
+export default { getMessages, sendMessage };

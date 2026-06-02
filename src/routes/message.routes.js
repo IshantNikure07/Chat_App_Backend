@@ -4,8 +4,6 @@ import { authenticate } from '../middleware/auth.middleware.js';
 
 const messageRouter = Router();
 
-messageRouter.use(authenticate);
-
 /**
  * @swagger
  * /api/messages/{conversationId}:
@@ -24,6 +22,7 @@ messageRouter.use(authenticate);
  *       200:
  *         description: List of messages
  */
-messageRouter.get("/:conversationId", messageController.getMessages);
+messageRouter.get("/:conversationId", authenticate, messageController.getMessages);
+messageRouter.post("/send", messageController.sendMessage);
 
 export default messageRouter;
