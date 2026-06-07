@@ -87,6 +87,7 @@ async function getMessages(req, res) {
  *               - sender_id
  *               - receiver_id
  *               - message
+ *               - conversation_id
  *             properties:
  *               sender_id:
  *                 type: string
@@ -94,6 +95,9 @@ async function getMessages(req, res) {
  *               receiver_id:
  *                 type: string
  *                 description: The receiver's user ID
+ *               conversation_id:
+ *                 type: string
+ *                 description: The conversation ID
  *               message:
  *                 type: string
  *                 description: The message text content
@@ -114,7 +118,7 @@ async function sendMessage(req, res) {
             return res.status(403).json({ success: false, message: "Forbidden: Invalid Internal API Key" });
         }
 
-        const { sender_id, receiver_id, message } = req.body;
+        const { sender_id, receiver_id, message , conversation_id} = req.body;
 
         if (!sender_id || !receiver_id || !message) {
             return res.status(400).json({ 
@@ -126,6 +130,7 @@ async function sendMessage(req, res) {
         const savedMessage = await MessageService.processMessage({
             senderId: Number(sender_id),
             receiverId: Number(receiver_id),
+            conversationId: conversation_id ? Number(conversation_id) : undefined,
             content: message,
             isGroup: false
         });

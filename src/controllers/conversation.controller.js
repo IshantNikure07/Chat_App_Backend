@@ -3,9 +3,102 @@ import Joi from "joi";
 
 const createConversationSchema = Joi.object({
     receiverId: Joi.number().required(),
+    senderId: Joi.number().optional(),
     type: Joi.string().valid("direct", "group").default("direct")
 });
-
+/**
+ * @swagger
+ * /api/conversation:
+ *   post:
+ *     summary: Create a new conversation (direct or group)
+ *     description: Creates a new conversation or returns existing direct conversation if already present
+ *     tags: [Conversation]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: x-internal-api-key
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Optional internal API key to bypass JWT token check
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - receiverId
+ *             properties:
+ *               receiverId:
+ *                 type: number
+ *                 example: 2
+ *               senderId:
+ *                 type: number
+ *                 description: Optional sender ID (used for internal/chatbot requests)
+ *                 example: 1
+ *               type:
+ *                 type: string
+ *                 enum: [direct, group]
+ *                 example: direct
+ *     responses:
+ *       201:
+ *         description: Conversation created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Conversation created successfully
+ *                 conversationId:
+ *                   type: number
+ *                   example: 12
+ *
+ *       200:
+ *         description: Conversation already exists (for direct chat)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Conversation already exists
+ *                 conversationId:
+ *                   type: number
+ *                   example: 12
+ *
+ *       400:
+ *         description: Bad request (validation error or self chat)
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: Cannot create conversation with yourself
+ *
+ *       404:
+ *         description: Receiver not found
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: Receiver user not found
+ *
+ *       401:
+ *         description: Unauthorized (missing or invalid token)
+ *
+ *       500:
+ *         description: Internal server error
+ */
 async function createConversation(req, res) {
     try {
         const { error, value } = createConversationSchema.validate(req.body);
@@ -13,10 +106,14 @@ async function createConversation(req, res) {
             return res.status(400).json({ success: false, message: error.details[0].message });
         }
 
-        const { receiverId, type } = value;
-        const senderId = req.user.id;
+        const { receiverId, type, senderId: bodySenderId } = value;
+        const senderIdVal = req.user?.id || bodySenderId;
+        if (!senderIdVal) {
+            return res.status(400).json({ success: false, message: "Sender ID is required" });
+        }
+        const senderId = Number(senderIdVal);
 
-        if (senderId === receiverId) {
+        if (senderId === Number(receiverId)) {
             return res.status(400).json({ success: false, message: "Cannot create conversation with yourself" });
         }
 
@@ -64,6 +161,55 @@ async function createConversation(req, res) {
     }
 }
 
+/**
+ * @swagger
+ * /api/conversation:
+ *   get:
+ *     summary: Get all conversations
+ *     tags: [Conversation]
+ *     security:
+ *       - bearerAuth: []       
+ *     responses:
+ *       200:
+ *         description: Conversations fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 conversations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         example: "12"
+ *                       name:
+ *                         type: string
+ *                         example: Hemant
+ *                       lastMessage:
+ *                         type: string
+ *                         example: Hello
+ *                       time:
+ *                         type: string
+ *                         example: "11:32 AM"
+ *                       unreadCount:
+ *                         type: number
+ *                         example: 0
+ *                       avatar:
+ *                         type: string
+ *                         example: "https://ui-avatars.com/api/?name=Hemant"
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
 async function getConversations(req, res) {
     try {
         const userId = req.user.id;
