@@ -7,7 +7,7 @@ const registerSchema = Joi.object({
     username: Joi.string().required(),
     email: Joi.string().email().required(),
     password: Joi.string().min(6).required()
-});
+}).required();
 
 const loginSchema = Joi.object({
     email: Joi.string().email().required(),
@@ -20,12 +20,21 @@ const refreshTokenSchema = Joi.object({
 
 async function register(req, res) {
     try {
+        // Run altering table just in case the column doesn't exist
+        await db.query("ALTER TABLE users ADD COLUMN avatar VARCHAR(255) DEFAULT NULL").catch(() => {});
+
         const { error, value } = registerSchema.validate(req.body);
         if (error) {
             return res.status(400).json({ success: false, message: error.details[0].message });
         }
 
         const { username, email, password } = value;
+        let avatarUrl = null;
+
+        if (req.file) {
+            // Because we store it in public/uploads, creating an accessible URL
+            avatarUrl = "/public/uploads/" + req.file.filename;
+        }
 
         const [rows] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
         if (rows.length > 0) {
@@ -35,11 +44,15 @@ async function register(req, res) {
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const [result] = await db.query(
-            "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-            [username, email, hashedPassword]
+            "INSERT INTO users (username, email, password, avatar) VALUES (?, ?, ?, ?)",
+            [username, email, hashedPassword, avatarUrl]
         );
 
-        const token = jwt.sign({ id: result.insertId }, process.env.JWT_SECRET, { expiresIn: "15m" });
+        const token = jwt.sign(
+            { user: { id: result.insertId, username, email, avatar: avatarUrl } }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: "15m" }
+        );
 
         return res.status(201).json({
             success: true,
@@ -48,6 +61,7 @@ async function register(req, res) {
                 id: result.insertId,
                 username,
                 email,
+                avatar: avatarUrl
             },
             token
         });
@@ -80,10 +94,10 @@ async function getMe(req, res) {
             });
         }
 
-        const { id } = decoded;
+        const id = decoded.user ? decoded.user.id : decoded.id;
 
         const [rows] = await db.query(
-            "SELECT id, username, email FROM users WHERE id = ?",
+            "SELECT id, username, email, avatar FROM users WHERE id = ?",
             [id]
         );
 
@@ -100,6 +114,7 @@ async function getMe(req, res) {
                 id: rows[0].id,
                 username: rows[0].username,
                 email: rows[0].email,
+                avatar: rows[0].avatar,
             }
         });
 
@@ -132,7 +147,11 @@ async function login(req, res) {
             return res.status(400).json({ success: false, message: "Invalid Email or Password" });
         }
 
-        const token = jwt.sign({ id: rows[0].id }, process.env.JWT_SECRET, { expiresIn: "15m" });
+        const token = jwt.sign(
+            { user: { id: rows[0].id, username: rows[0].username, email: rows[0].email, avatar: rows[0].avatar } }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: "15m" }
+        );
         const refreshToken = jwt.sign({ id: rows[0].id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
         await db.query(
@@ -147,6 +166,7 @@ async function login(req, res) {
                 id: rows[0].id,
                 username: rows[0].username,
                 email: rows[0].email,
+                avatar: rows[0].avatar,
             },
             token,
             refreshToken
@@ -211,7 +231,7 @@ async function refreshToken(req, res) {
             });
         }
 
-        const { id } = decoded;
+        const id = decoded.user ? decoded.user.id : decoded.id;
 
         // 4. ROTATION (IMPORTANT 🔥)
         await db.query(
@@ -231,8 +251,9 @@ async function refreshToken(req, res) {
         );
 
         // 5. New access token
+        const [userRows] = await db.query("SELECT id, username, email, avatar FROM users WHERE id = ?", [id]);
         const newAccessToken = jwt.sign(
-            { id },
+            { user: { id: userRows[0].id, username: userRows[0].username, email: userRows[0].email, avatar: userRows[0].avatar } },
             process.env.JWT_SECRET,
             { expiresIn: "15m" }
         );

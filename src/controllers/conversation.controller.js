@@ -1,0 +1,278 @@
+import db from "../config/db.js";
+import Joi from "joi";
+
+const createConversationSchema = Joi.object({
+    receiverId: Joi.number().required(),
+    senderId: Joi.number().optional(),
+    type: Joi.string().valid("direct", "group").default("direct")
+});
+/**
+ * @swagger
+ * /api/conversation:
+ *   post:
+ *     summary: Create a new conversation (direct or group)
+ *     description: Creates a new conversation or returns existing direct conversation if already present
+ *     tags: [Conversation]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: x-internal-api-key
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Optional internal API key to bypass JWT token check
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - receiverId
+ *             properties:
+ *               receiverId:
+ *                 type: number
+ *                 example: 2
+ *               senderId:
+ *                 type: number
+ *                 description: Optional sender ID (used for internal/chatbot requests)
+ *                 example: 1
+ *               type:
+ *                 type: string
+ *                 enum: [direct, group]
+ *                 example: direct
+ *     responses:
+ *       201:
+ *         description: Conversation created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Conversation created successfully
+ *                 conversationId:
+ *                   type: number
+ *                   example: 12
+ *
+ *       200:
+ *         description: Conversation already exists (for direct chat)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Conversation already exists
+ *                 conversationId:
+ *                   type: number
+ *                   example: 12
+ *
+ *       400:
+ *         description: Bad request (validation error or self chat)
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: Cannot create conversation with yourself
+ *
+ *       404:
+ *         description: Receiver not found
+ *         content:
+ *           application/json:
+ *             example:
+ *               success: false
+ *               message: Receiver user not found
+ *
+ *       401:
+ *         description: Unauthorized (missing or invalid token)
+ *
+ *       500:
+ *         description: Internal server error
+ */
+async function createConversation(req, res) {
+    try {
+        const { error, value } = createConversationSchema.validate(req.body);
+        if (error) {
+            return res.status(400).json({ success: false, message: error.details[0].message });
+        }
+
+        const { receiverId, type, senderId: bodySenderId } = value;
+        const senderIdVal = req.user?.id || bodySenderId;
+        if (!senderIdVal) {
+            return res.status(400).json({ success: false, message: "Sender ID is required" });
+        }
+        const senderId = Number(senderIdVal);
+
+        if (senderId === Number(receiverId)) {
+            return res.status(400).json({ success: false, message: "Cannot create conversation with yourself" });
+        }
+
+        // Verify receiver exists
+        const [receiverRow] = await db.query("SELECT id FROM users WHERE id = ?", [receiverId]);
+        if (receiverRow.length === 0) {
+            return res.status(404).json({ success: false, message: "Receiver user not found" });
+        }
+
+        if (type === "direct") {
+            const [existingChats] = await db.query(
+                `SELECT c.id FROM conversations c 
+                 JOIN conversation_participants p1 ON c.id = p1.conversation_id 
+                 JOIN conversation_participants p2 ON c.id = p2.conversation_id 
+                 WHERE c.type = 'direct' AND p1.user_id = ? AND p2.user_id = ?`,
+                [senderId, receiverId]
+            );
+
+            if (existingChats.length > 0) {
+                return res.status(200).json({ 
+                    success: true, 
+                    message: "Conversation already exists", 
+                    conversationId: existingChats[0].id 
+                });
+            }
+        }
+
+        const [newChat] = await db.query("INSERT INTO conversations (type) VALUES (?)", [type]);
+        const conversationId = newChat.insertId;
+
+        await db.query(
+            "INSERT INTO conversation_participants (conversation_id, user_id) VALUES (?, ?), (?, ?)",
+            [conversationId, senderId, conversationId, receiverId]
+        );
+
+        return res.status(201).json({ 
+            success: true, 
+            message: "Conversation created successfully", 
+            conversationId 
+        });
+
+    } catch (error) {
+        console.error("Create Conversation Error:", error);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
+}
+
+/**
+ * @swagger
+ * /api/conversation:
+ *   get:
+ *     summary: Get all conversations
+ *     tags: [Conversation]
+ *     security:
+ *       - bearerAuth: []       
+ *     responses:
+ *       200:
+ *         description: Conversations fetched successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 conversations:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         example: "12"
+ *                       name:
+ *                         type: string
+ *                         example: Hemant
+ *                       lastMessage:
+ *                         type: string
+ *                         example: Hello
+ *                       time:
+ *                         type: string
+ *                         example: "11:32 AM"
+ *                       unreadCount:
+ *                         type: number
+ *                         example: 0
+ *                       avatar:
+ *                         type: string
+ *                         example: "https://ui-avatars.com/api/?name=Hemant"
+ *       400:
+ *         description: Bad request
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Internal server error
+ */
+async function getConversations(req, res) {
+    try {
+        const userId = req.user.id;
+
+        const [conversations] = await db.query(
+            `SELECT 
+                c.id as conversation_id, c.type, c.last_message_id,
+                m.content as last_message_content, m.created_at as last_message_time,
+                u.id as other_user_id, u.username as other_user_name, u.email as other_user_email, u.avatar as other_user_avatar,
+                (
+                    SELECT COUNT(*) 
+                    FROM messages msg 
+                    WHERE msg.conversation_id = c.id 
+                      AND msg.sender_id != ? 
+                      AND (cp1.last_read_message_id IS NULL OR msg.id > cp1.last_read_message_id)
+                ) as unread_count
+            FROM conversations c
+            JOIN conversation_participants cp1 ON c.id = cp1.conversation_id AND cp1.user_id = ?
+            LEFT JOIN conversation_participants cp2 ON c.id = cp2.conversation_id AND cp2.user_id != ?
+            LEFT JOIN users u ON cp2.user_id = u.id
+            LEFT JOIN messages m ON c.last_message_id = m.id
+            ORDER BY m.created_at DESC, c.id DESC`,
+            [userId, userId, userId]
+        );
+
+        const formattedConversations = conversations.reduce((acc, row) => {
+            if (!acc[row.conversation_id]) {
+                const date = row.last_message_time ? new Date(row.last_message_time) : null;
+                const timeStr = date ? date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '';
+                
+                acc[row.conversation_id] = {
+                    id: row.conversation_id.toString(),
+                    name: row.other_user_name || 'Unknown',
+                    lastMessage: row.last_message_content || 'No message',
+                    time: timeStr || "no date",
+                    unreadCount: Number(row.unread_count || 0),
+                    avatar: row.other_user_avatar || `https://ui-avatars.com/api/?name=${row.other_user_name ? encodeURIComponent(row.other_user_name) : 'User'}&background=random`,
+                    _timestamp: date ? date.getTime() : 0
+                };
+            }
+            return acc;
+        }, {});
+
+        // Sort formatted conversations by last message time or conversation ID
+        const sortedConversations = Object.values(formattedConversations)
+            .sort((a, b) => {
+                if (a._timestamp !== b._timestamp) return b._timestamp - a._timestamp;
+                return parseInt(b.id) - parseInt(a.id);
+            })
+            .map(conv => {
+                delete conv._timestamp;
+                return conv;
+            });
+
+        return res.status(200).json({ 
+            success: true, 
+            conversations: sortedConversations 
+        });
+
+    } catch (error) {
+        console.error("Get Conversations Error:", error);
+        return res.status(500).json({ success: false, message: "Internal server error" });
+    }
+}
+
+export default { createConversation, getConversations };
