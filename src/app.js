@@ -12,7 +12,7 @@ const app = express();
 setupSwagger(app);
 
 app.use(cors({
-    origin: "*",   // or specify your frontend URL e.g., "http://localhost:8081"
+    origin: true,
     credentials: true,
 }));
 app.use(express.json());

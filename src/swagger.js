@@ -11,6 +11,14 @@ const options = {
     },
     servers: [
       {
+        url: "/",
+        description: "Current Host (Auto-detect)",
+      },
+      ...(process.env.RENDER_EXTERNAL_URL ? [{
+        url: process.env.RENDER_EXTERNAL_URL,
+        description: "Render Production Server",
+      }] : []),
+      {
         url: "http://localhost:3000",
         description: "Development server",
       },
