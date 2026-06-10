@@ -19,7 +19,7 @@ export const authenticate = (req, res, next) => {
         next();
     } catch (error) {
         console.error("Auth Middleware Error:", error);
-        return res.status(500).json({ success: false, message: "Internal server error" });
+        return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
     }
 };
 
@@ -48,6 +48,6 @@ export const authenticateOrInternalKey = (req, res, next) => {
         next();
     } catch (error) {
         console.error("Auth Middleware Error:", error);
-        return res.status(500).json({ success: false, message: "Internal server error" });
+        return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
     }
 };

@@ -122,7 +122,8 @@ async function getMe(req, res) {
         console.error("GetMe Error:", error);
         return res.status(500).json({
             success: false,
-            message: "Internal server error"
+            message: "Internal server error",
+            error: error.message
         });
     }
 }
@@ -174,7 +175,7 @@ async function login(req, res) {
 
     } catch (error) {
         console.error("Login Error:", error);
-        return res.status(500).json({ success: false, message: "Internal server error" });
+        return res.status(500).json({ success: false, message: "Internal server error" , error: error.message});
     }
 }
 
@@ -268,7 +269,8 @@ async function refreshToken(req, res) {
         console.error("RefreshToken Error:", error);
         return res.status(500).json({
             success: false,
-            message: "Internal server error"
+            message: "Internal server error",
+            error: error.message
         });
     }
 }
