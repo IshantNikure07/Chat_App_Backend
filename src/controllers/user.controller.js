@@ -143,33 +143,33 @@ async function uploadAvatar(req, res) {
             return res.status(400).json({ success: false, message: "No file uploaded" });
         }
 
-        // Verify user exists first
-        const userExists = await prisma.user.findUnique({
-            where: { id: userId }
-        });
-        if (!userExists) {
-            return res.status(404).json({ success: false, message: "User not found" });
-        }
-
         const avatarUrl = "/public/uploads/" + req.file.filename;
 
-        // Update user avatar in DB
-        const updatedUser = await prisma.user.update({
-            where: { id: userId },
-            data: { avatar: avatarUrl },
-            select: {
-                id: true,
-                username: true,
-                email: true,
-                avatar: true
-            }
-        });
+        try {
+            // Update user avatar in DB directly
+            const updatedUser = await prisma.user.update({
+                where: { id: userId },
+                data: { avatar: avatarUrl },
+                select: {
+                    id: true,
+                    username: true,
+                    email: true,
+                    avatar: true
+                }
+            });
 
-        return res.status(200).json({ 
-            success: true, 
-            message: "Profile picture uploaded successfully", 
-            user: updatedUser 
-        });
+            return res.status(200).json({ 
+                success: true, 
+                message: "Profile picture uploaded successfully", 
+                user: updatedUser 
+            });
+        } catch (prismaError) {
+            // P2025 is Prisma's error code for "Record to update not found"
+            if (prismaError.code === "P2025") {
+                return res.status(404).json({ success: false, message: "User not found" });
+            }
+            throw prismaError;
+        }
     } catch (error) {
         console.error("Upload Avatar Error:", error);
         return res.status(500).json({ success: false, message: "Internal server error" });
