@@ -4,6 +4,7 @@ import { config } from "./config.js";
 let poolConfig;
 
 if (process.env.DATABASE_URL) {
+  console.log("Connecting to MySQL using DATABASE_URL");
   try {
     const dbUrl = new URL(process.env.DATABASE_URL);
     poolConfig = {
@@ -22,6 +23,7 @@ if (process.env.DATABASE_URL) {
     poolConfig = process.env.DATABASE_URL;
   }
 } else {
+  console.log("Connecting to MySQL using config.db");
   poolConfig = {
     host: config.db.host,
     user: config.db.user,
@@ -33,6 +35,7 @@ if (process.env.DATABASE_URL) {
 }
 
 const db = mysql.createPool(poolConfig);
+
 
 
 export default db.promise();
