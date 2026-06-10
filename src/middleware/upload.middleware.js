@@ -1,5 +1,9 @@
 import multer from "multer";
 import path from "path";
+import fs from "fs";
+
+// Ensure upload directory exists
+fs.mkdirSync("public/uploads", { recursive: true });
 
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {

@@ -38,9 +38,13 @@ authRouter.post("/login", authController.login);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - username
+ *               - email
+ *               - password
  *             properties:
  *               username:
  *                 type: string
@@ -48,8 +52,12 @@ authRouter.post("/login", authController.login);
  *                 type: string
  *               password:
  *                 type: string
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *                 description: Optional profile picture file (jpeg, png, jpg, webp)
  *     responses:
- *       200:
+ *       201:
  *         description: User registered successfully
  *       400:
  *         description: Bad request
