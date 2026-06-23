@@ -16,6 +16,7 @@ if (process.env.DATABASE_URL) {
       password: decodeURIComponent(dbUrl.password),
       database: dbUrl.pathname.substring(1),
       connectionLimit: 10,
+      connectTimeout: 10000,
       allowPublicKeyRetrieval: true,
       ssl: {
         rejectUnauthorized: false
@@ -29,6 +30,7 @@ if (process.env.DATABASE_URL) {
       password: process.env.DB_PASSWORD,
       database: process.env.DB_NAME || "chat_app_backend",
       connectionLimit: 10,
+      connectTimeout: 10000,
       allowPublicKeyRetrieval: true,
     };
   }
@@ -40,6 +42,7 @@ if (process.env.DATABASE_URL) {
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME || "chat_app_backend",
     connectionLimit: 10,
+    connectTimeout: 10000,
     allowPublicKeyRetrieval: true,
   };
 }

@@ -18,6 +18,7 @@ if (process.env.DATABASE_URL) {
       },
       waitForConnections: true,
       connectionLimit: 10,
+      connectTimeout: 10000,
     };
   } catch (error) {
     poolConfig = process.env.DATABASE_URL;
@@ -31,11 +32,23 @@ if (process.env.DATABASE_URL) {
     database: config.db.database,
     waitForConnections: true,
     connectionLimit: 10,
+    connectTimeout: 10000,
   };
+}
+
+if (typeof poolConfig === "object") {
+  poolConfig.timezone = "+05:30";
 }
 
 const db = mysql.createPool(poolConfig);
 
-
+// Ensure every new connection sets its session time_zone to IST (+05:30)
+db.on("connection", (connection) => {
+  connection.query("SET time_zone = '+05:30';", (err) => {
+    if (err) {
+      console.error("Error setting session timezone to IST (+05:30):", err);
+    }
+  });
+});
 
 export default db.promise();
